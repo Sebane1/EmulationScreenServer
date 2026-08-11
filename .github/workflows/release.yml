@@ -36,13 +36,15 @@ jobs:
           APP_VERSION: ${{ github.ref_name }}
         run: |
           VERSION="${APP_VERSION#v}"
+          ASSEMBLY_VERSION="${VERSION%%-*}"
           dotnet publish "$PROJECT_PATH" \
             --configuration Release \
             --framework "$DOTNET_FRAMEWORK" \
             -p:TargetFrameworks="$DOTNET_FRAMEWORK" \
             -p:Version="$VERSION" \
-            -p:AssemblyVersion="$VERSION.0" \
-            -p:FileVersion="$VERSION.0" \
+            -p:InformationalVersion="$VERSION" \
+            -p:AssemblyVersion="$ASSEMBLY_VERSION" \
+            -p:FileVersion="$ASSEMBLY_VERSION" \
             --runtime "$DOTNET_RUNTIME" \
             --self-contained true \
             -p:PublishReadyToRun=true \
@@ -84,13 +86,15 @@ jobs:
           APP_VERSION: ${{ github.ref_name }}
         run: |
           VERSION="${APP_VERSION#v}"
+          ASSEMBLY_VERSION="${VERSION%%-*}"
           dotnet publish "$PROJECT_PATH" \
             --configuration Release \
             --framework "$DOTNET_FRAMEWORK" \
             -p:TargetFrameworks="$DOTNET_FRAMEWORK" \
             -p:Version="$VERSION" \
-            -p:AssemblyVersion="$VERSION.0" \
-            -p:FileVersion="$VERSION.0" \
+            -p:InformationalVersion="$VERSION" \
+            -p:AssemblyVersion="$ASSEMBLY_VERSION" \
+            -p:FileVersion="$ASSEMBLY_VERSION" \
             --runtime "$DOTNET_RUNTIME" \
             --self-contained true \
             -p:PublishReadyToRun=true \
