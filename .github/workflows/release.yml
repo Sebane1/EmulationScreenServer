@@ -36,6 +36,7 @@ jobs:
           dotnet publish "$PROJECT_PATH" \
             --configuration Release \
             --framework "$DOTNET_FRAMEWORK" \
+            -p:TargetFrameworks="$DOTNET_FRAMEWORK" \
             --runtime "$DOTNET_RUNTIME" \
             --self-contained true \
             -p:PublishReadyToRun=true \
@@ -77,6 +78,7 @@ jobs:
           dotnet publish "$PROJECT_PATH" \
             --configuration Release \
             --framework "$DOTNET_FRAMEWORK" \
+            -p:TargetFrameworks="$DOTNET_FRAMEWORK" \
             --runtime "$DOTNET_RUNTIME" \
             --self-contained true \
             -p:PublishReadyToRun=true \

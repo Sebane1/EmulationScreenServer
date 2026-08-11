@@ -8,6 +8,11 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
+  <!-- On Linux (CI or local), only target net10.0 — Windows TFM cannot be restored there. -->
+  <PropertyGroup Condition="'$(OS)' == 'Unix'">
+    <TargetFrameworks>net10.0</TargetFrameworks>
+  </PropertyGroup>
+
   <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0-windows'">
     <UseWindowsForms>true</UseWindowsForms>
     <DefineConstants>$(DefineConstants);WINDOWS</DefineConstants>
@@ -26,7 +31,7 @@
     <PackageReference Include="NAudio" Version="2.3.0" />
     <PackageReference Include="NAudio.Core" Version="2.3.0" />
     <PackageReference Include="NAudio.Wasapi" Version="2.3.0" />
-    <PackageReference Include="Nefarius.ViGEm.Client" Version="1.21.156" />
+    <PackageReference Include="Nefarius.ViGEm.Client" Version="1.21.223" />
     <PackageReference Include="PInvoke.Kernel32" Version="0.7.124" />
   </ItemGroup>
 
