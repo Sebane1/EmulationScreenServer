@@ -1,0 +1,70 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        x:Class="EmulationScreenServer.MainWindow"
+        Title="Emulation Screen Server"
+        Width="700" Height="580"
+        WindowStartupLocation="CenterScreen">
+
+  <Grid RowDefinitions="Auto,*">
+    <!-- Top Bar / Controls -->
+    <StackPanel Grid.Row="0" Margin="10" Spacing="10" Orientation="Horizontal">
+      <Button x:Name="StartButton" Content="Start Server" Background="DarkGreen" Foreground="White" Width="120" HorizontalContentAlignment="Center" Click="OnStartClicked"/>
+      <Button x:Name="StopButton" Content="Stop Server" Background="DarkRed" Foreground="White" Width="120" HorizontalContentAlignment="Center" IsEnabled="False" Click="OnStopClicked"/>
+      <TextBlock x:Name="StatusText" Text="Status: Stopped" VerticalAlignment="Center" FontWeight="Bold" Foreground="DarkGray" Margin="10,0,0,0"/>
+    </StackPanel>
+
+    <!-- Main Content Tab Control -->
+    <TabControl Grid.Row="1" Margin="10,0,10,10">
+      
+      <!-- General Tab -->
+      <TabItem Header="Dashboard">
+        <StackPanel Spacing="12" Margin="10">
+          <TextBlock Text="Local Network URL:" FontWeight="Bold"/>
+          <TextBox x:Name="LocalRtspUrlBox" IsReadOnly="True" PlaceholderText="Server not running"/>
+          <Button Content="Copy Local URL" Click="OnCopyLocalUrlClicked" Width="200" HorizontalAlignment="Left"/>
+
+          <TextBlock Text="Public Internet URL:" FontWeight="Bold" Margin="0,8,0,0"/>
+          <TextBox x:Name="PublicRtspUrlBox" IsReadOnly="True" PlaceholderText="Server not running"/>
+          <Button Content="Copy Public URL" Click="OnCopyPublicUrlClicked" Width="200" HorizontalAlignment="Left"/>
+          <TextBlock Text="Public access requires port 8554 (RTSP) to be forwarded on your router."
+                     FontStyle="Italic" Foreground="Gray" TextWrapping="Wrap"/>
+
+          <TextBlock Text="Input Forwarding:" FontWeight="Bold" Margin="0,10,0,0"/>
+          <TextBlock x:Name="InputStatusText" Text="Not running" Foreground="Gray"/>
+        </StackPanel>
+      </TabItem>
+
+      <!-- Settings Tab -->
+      <TabItem Header="Settings">
+        <StackPanel Spacing="15" Margin="10">
+          <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" Margin="0,10,0,0">
+            <TextBlock Grid.Row="0" Grid.Column="0" Text="Monitor Index:" VerticalAlignment="Center" Margin="0,0,10,10"/>
+            <NumericUpDown Grid.Row="0" Grid.Column="1" x:Name="MonitorIndexSpinner" Value="0" Minimum="0" Maximum="10" Margin="0,0,0,10"/>
+
+            <TextBlock Grid.Row="1" Grid.Column="0" Text="Target FPS:" VerticalAlignment="Center" Margin="0,0,10,10"/>
+            <NumericUpDown Grid.Row="1" Grid.Column="1" x:Name="FpsSpinner" Value="60" Minimum="1" Maximum="240" Margin="0,0,0,10"/>
+
+            <TextBlock Grid.Row="2" Grid.Column="0" Text="Enable Audio:" VerticalAlignment="Center" Margin="0,0,10,10"/>
+            <CheckBox Grid.Row="2" Grid.Column="1" x:Name="EnableAudioCheckBox" IsChecked="True" Margin="0,0,0,10"/>
+
+            <TextBlock Grid.Row="3" Grid.Column="0" Text="Mouse Forwarding:" VerticalAlignment="Center" Margin="0,0,10,10"/>
+            <CheckBox Grid.Row="3" Grid.Column="1" x:Name="EnableMouseForwardingCheckBox" IsChecked="True" Margin="0,0,0,10"/>
+
+            <TextBlock Grid.Row="4" Grid.Column="0" Text="Controller Forwarding:" VerticalAlignment="Center" Margin="0,0,10,10"/>
+            <CheckBox Grid.Row="4" Grid.Column="1" x:Name="EnableControllerForwardingCheckBox" IsChecked="True"/>
+          </Grid>
+          <TextBlock Text="Note: Configuration changes only apply after restarting the server." FontStyle="Italic" Foreground="Gray" Margin="0,20,0,0"/>
+        </StackPanel>
+      </TabItem>
+
+      <!-- Logs Tab -->
+      <TabItem Header="Logs">
+        <TextBox x:Name="LogTextBox" IsReadOnly="True" TextWrapping="Wrap" ScrollViewer.VerticalScrollBarVisibility="Auto" FontFamily="Consolas"/>
+      </TabItem>
+
+    </TabControl>
+  </Grid>
+</Window>

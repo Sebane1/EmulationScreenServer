@@ -1,0 +1,24 @@
+# Build outputs
+[Bb]in/
+[Oo]bj/
+
+# IDE
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Runtime-downloaded dependencies (FFmpeg, MediaMTX, etc.)
+**/_bin/
+
+# Accidental local copies of downloaded binaries/config
+**/mediamtx.exe
+**/mediamtx.yml
+**/mtx.zip
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
