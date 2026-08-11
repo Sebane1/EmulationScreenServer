@@ -1,33 +1,8 @@
 ﻿using System;
-using NAudio.Wave;
-using NAudio.Wave.SampleProviders;
 
 public class SilentTone
 {
-    private WaveOutEvent? _output;
-    private ISampleProvider? _provider;
+    public void Start() { }
 
-    public void Start()
-    {
-        // Create a sine wave at 440 Hz
-        var sine = new SignalGenerator()
-        {
-            Gain = 0.0001,   // Extremely low amplitude (~ -80 dB)
-            Frequency = 440,
-            Type = SignalGeneratorType.Sin
-        };
-
-        _provider = sine;
-
-        _output = new WaveOutEvent();
-        _output.Init(_provider);
-        _output.Play();
-    }
-
-    public void Stop()
-    {
-        _output?.Stop();
-        _output?.Dispose();
-        _output = null;
-    }
+    public void Stop() { }
 }

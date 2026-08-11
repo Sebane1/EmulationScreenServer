@@ -1,33 +1,41 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Net.Http;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
-using System.Diagnostics;
-using Nefarius.ViGEm.Client;
 
 namespace EmulationScreenServer
 {
-    public static class DependencyManager
+    public static partial class DependencyManager
     {
         private static readonly string BinPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "_bin");
 
-        // Hardcoded URLs for POC reliability
-        private const string MediaMtxUrl = "https://github.com/bluenviron/mediamtx/releases/download/v1.9.3/mediamtx_v1.9.3_windows_amd64.zip";
-        private const string VigemUrl = "https://github.com/ViGEm/ViGEmBus/releases/download/v1.22.0/ViGEmBus_1.22.0_x64_x86_arm64.exe";
+        private const string MediaMtxUrlWindows =
+            "https://github.com/bluenviron/mediamtx/releases/download/v1.9.3/mediamtx_v1.9.3_windows_amd64.zip";
 
-        /// <summary>
-        /// BtbN win64 <strong>gpl</strong> "full" build: gdigrab, WASAPI (-f wasapi -loopback), libx264, native AAC, NVENC, etc.
-        /// Pinned to FFmpeg <strong>8.1</strong> release branch (not master) so behavior stays predictable.
-        /// Override with <c>EMUSCREEN_FFMPEG_URL</c>. Force replace with <c>EMUSCREEN_FFMPEG_REDOWNLOAD=1</c>.
-        /// </summary>
-        private const string DefaultFfmpegUrl =
+        private const string MediaMtxUrlLinux =
+            "https://github.com/bluenviron/mediamtx/releases/download/v1.9.3/mediamtx_v1.9.3_linux_amd64.tar.gz";
+
+        private const string DefaultFfmpegUrlWindows =
             "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n8.1-latest-win64-gpl-8.1.zip";
+
+        private const string DefaultFfmpegUrlLinux =
+            "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n8.1-latest-linux64-gpl-8.1.tar.xz";
+
+        private static string MediaMtxBinaryName =>
+            OperatingSystem.IsWindows() ? "mediamtx.exe" : "mediamtx";
+
+        private static string FfmpegBinaryName =>
+            OperatingSystem.IsWindows() ? "ffmpeg.exe" : "ffmpeg";
 
         private static string GetFfmpegDownloadUrl()
         {
             var u = Environment.GetEnvironmentVariable("EMUSCREEN_FFMPEG_URL")?.Trim();
-            return string.IsNullOrEmpty(u) ? DefaultFfmpegUrl : u;
+            if (!string.IsNullOrEmpty(u)) return u;
+
+            return OperatingSystem.IsWindows() ? DefaultFfmpegUrlWindows : DefaultFfmpegUrlLinux;
         }
 
         private static bool ShouldRedownloadFfmpeg()
@@ -49,8 +57,11 @@ namespace EmulationScreenServer
             Console.WriteLine("[DependencyManager] MediaMTX ready.");
             await EnsureFfmpegAsync();
             Console.WriteLine("[DependencyManager] FFmpeg ready.");
+
+#if WINDOWS
             await EnsureViGEmBusAsync();
             Console.WriteLine("[DependencyManager] ViGEmBus ready.");
+#endif
 
             Console.WriteLine("[DependencyManager] All dependencies ready.");
             return true;
@@ -58,52 +69,68 @@ namespace EmulationScreenServer
 
         private static async Task EnsureMediaMtxAsync()
         {
-            string mtxPath = Path.Combine(BinPath, "mediamtx.exe");
+            string mtxPath = Path.Combine(BinPath, MediaMtxBinaryName);
             if (File.Exists(mtxPath))
             {
                 var fi = new FileInfo(mtxPath);
-                if (fi.Length > 10 * 1024 * 1024) // Should be ~30MB, if it's less than 10MB it's corrupted
+                if (fi.Length > 10 * 1024 * 1024)
                 {
+                    WriteMediaMtxConfig();
                     return;
                 }
-                Console.WriteLine("[DependencyManager] mediamtx.exe is corrupted or incomplete. Redownloading...");
+
+                Console.WriteLine($"[DependencyManager] {MediaMtxBinaryName} is corrupted or incomplete. Redownloading...");
                 File.Delete(mtxPath);
             }
 
             Console.WriteLine("[DependencyManager] Downloading MediaMTX...");
-            string zipPath = Path.Combine(BinPath, "mediamtx.zip");
-            await DownloadFileAsync(MediaMtxUrl, zipPath);
+            if (OperatingSystem.IsWindows())
+            {
+                string zipPath = Path.Combine(BinPath, "mediamtx.zip");
+                await DownloadFileAsync(MediaMtxUrlWindows, zipPath);
+                ZipFile.ExtractToDirectory(zipPath, BinPath, true);
+                File.Delete(zipPath);
+            }
+            else
+            {
+                string archivePath = Path.Combine(BinPath, "mediamtx.tar.gz");
+                await DownloadFileAsync(MediaMtxUrlLinux, archivePath);
+                ExtractTarGz(archivePath, BinPath);
+                File.Delete(archivePath);
+                TryMakeExecutable(mtxPath);
+            }
 
             Console.WriteLine("[DependencyManager] MediaMTX extraction complete.");
-            ZipFile.ExtractToDirectory(zipPath, BinPath, true);
-            File.Delete(zipPath);
+            WriteMediaMtxConfig();
+        }
 
-            // Generate optimized mediamtx.yml if missing
+        private static void WriteMediaMtxConfig()
+        {
             string ymlPath = Path.Combine(BinPath, "mediamtx.yml");
-            string config = @"
-logLevel: info
-rtmp: yes
-rtmpAddress: :1935
-rtsp: yes
-rtspAddress: :8554
-# Balanced outgoing buffer. 512 is default. 32 was too small and dropped clients.
-writeQueueSize: 512
-readBufferCount: 512
-writeTimeout: 5s
-hls: yes
-hlsAddress: :8888
-hlsVariant: lowLatency
-paths:
-  all:
-    allowPublishIPs: ['127.0.0.1', '::1']
-";
-            // Always overwrite the config to ensure correct settings
+            const string config = """
+                logLevel: info
+                rtmp: yes
+                rtmpAddress: :1935
+                rtsp: yes
+                rtspAddress: :8554
+                # Balanced outgoing buffer. 512 is default. 32 was too small and dropped clients.
+                writeQueueSize: 512
+                readBufferCount: 512
+                writeTimeout: 5s
+                hls: yes
+                hlsAddress: :8888
+                hlsVariant: lowLatency
+                paths:
+                  all:
+                    allowPublishIPs: ['127.0.0.1', '::1']
+                """;
+
             File.WriteAllText(ymlPath, config);
         }
 
         private static async Task EnsureFfmpegAsync()
         {
-            string ffmpegPath = Path.Combine(BinPath, "ffmpeg.exe");
+            string ffmpegPath = Path.Combine(BinPath, FfmpegBinaryName);
             if (ShouldRedownloadFfmpeg())
             {
                 try
@@ -111,54 +138,132 @@ paths:
                     if (File.Exists(ffmpegPath))
                     {
                         File.Delete(ffmpegPath);
-                        Console.WriteLine("[DependencyManager] EMUSCREEN_FFMPEG_REDOWNLOAD=1: removed existing ffmpeg.exe.");
+                        Console.WriteLine($"[DependencyManager] EMUSCREEN_FFMPEG_REDOWNLOAD=1: removed existing {FfmpegBinaryName}.");
                     }
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[DependencyManager] Could not delete ffmpeg.exe for redownload: {ex.Message}");
+                    Console.WriteLine($"[DependencyManager] Could not delete {FfmpegBinaryName} for redownload: {ex.Message}");
                 }
             }
 
             if (File.Exists(ffmpegPath)) return;
 
             string url = GetFfmpegDownloadUrl();
-            Console.WriteLine($"[DependencyManager] Downloading FFmpeg (BtbN win64 gpl; WASAPI loopback + gdigrab + NVENC)…");
+            Console.WriteLine($"[DependencyManager] Downloading FFmpeg…");
             Console.WriteLine($"[DependencyManager] URL: {url}");
-            string zipPath = Path.Combine(BinPath, "ffmpeg.zip");
-            await DownloadFileAsync(url, zipPath);
 
-            Console.WriteLine("[DependencyManager] FFmpeg extraction complete.");
-            // Only extract the single ffmpeg.exe entry — skip the hundreds of other files
-            bool extracted = false;
-            using (ZipArchive archive = ZipFile.OpenRead(zipPath))
+            if (OperatingSystem.IsWindows())
             {
-                foreach (ZipArchiveEntry entry in archive.Entries)
+                string zipPath = Path.Combine(BinPath, "ffmpeg.zip");
+                await DownloadFileAsync(url, zipPath);
+
+                bool extracted = false;
+                using (ZipArchive archive = ZipFile.OpenRead(zipPath))
                 {
-                    if (entry.Name.Equals("ffmpeg.exe", StringComparison.OrdinalIgnoreCase))
+                    foreach (ZipArchiveEntry entry in archive.Entries)
                     {
-                        entry.ExtractToFile(ffmpegPath, true);
-                        extracted = true;
-                        Console.WriteLine("[DependencyManager] ffmpeg.exe extracted successfully.");
-                        break;
+                        if (entry.Name.Equals("ffmpeg.exe", StringComparison.OrdinalIgnoreCase))
+                        {
+                            entry.ExtractToFile(ffmpegPath, true);
+                            extracted = true;
+                            Console.WriteLine("[DependencyManager] ffmpeg.exe extracted successfully.");
+                            break;
+                        }
                     }
                 }
-            }
-            try { File.Delete(zipPath); } catch { /* best-effort */ }
 
-            if (!extracted)
+                try { File.Delete(zipPath); } catch { }
+
+                if (!extracted)
+                {
+                    try { if (File.Exists(ffmpegPath)) File.Delete(ffmpegPath); } catch { }
+                    throw new InvalidOperationException(
+                        "ffmpeg.exe was not found inside the downloaded zip. Check EMUSCREEN_FFMPEG_URL or the BtbN release layout.");
+                }
+            }
+            else
             {
-                try { if (File.Exists(ffmpegPath)) File.Delete(ffmpegPath); } catch { }
-                throw new InvalidOperationException(
-                    "ffmpeg.exe was not found inside the downloaded zip. Check EMUSCREEN_FFMPEG_URL or the BtbN release layout.");
+                string archivePath = Path.Combine(BinPath, "ffmpeg.tar.xz");
+                await DownloadFileAsync(url, archivePath);
+
+                string extractDir = Path.Combine(BinPath, "ffmpeg_extract");
+                if (Directory.Exists(extractDir))
+                    Directory.Delete(extractDir, true);
+                Directory.CreateDirectory(extractDir);
+
+                RunTar($"-xJf \"{archivePath}\" -C \"{extractDir}\"");
+                File.Delete(archivePath);
+
+                string? discovered = FindFileRecursive(extractDir, "ffmpeg");
+                if (discovered == null || !File.Exists(discovered))
+                {
+                    try { Directory.Delete(extractDir, true); } catch { }
+                    throw new InvalidOperationException(
+                        "ffmpeg was not found inside the downloaded archive. Check EMUSCREEN_FFMPEG_URL or the BtbN release layout.");
+                }
+
+                File.Copy(discovered, ffmpegPath, true);
+                TryMakeExecutable(ffmpegPath);
+                try { Directory.Delete(extractDir, true); } catch { }
+                Console.WriteLine("[DependencyManager] ffmpeg extracted successfully.");
             }
 
             TryLogFfmpegVersion(ffmpegPath);
         }
 
-        /// <summary>
-        /// Prints ffmpeg -version (first line) so logs confirm which binary is in use.
-        /// </summary>
+        private static string? FindFileRecursive(string root, string fileName)
+        {
+            foreach (var file in Directory.EnumerateFiles(root, fileName, SearchOption.AllDirectories))
+                return file;
+            return null;
+        }
+
+        private static void ExtractTarGz(string archivePath, string destination)
+        {
+            RunTar($"-xzf \"{archivePath}\" -C \"{destination}\"");
+        }
+
+        private static void RunTar(string arguments)
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "tar",
+                Arguments = arguments,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+
+            using var process = Process.Start(psi)
+                ?? throw new InvalidOperationException("Failed to start tar for archive extraction.");
+
+            string stderr = process.StandardError.ReadToEnd();
+            process.WaitForExit();
+
+            if (process.ExitCode != 0)
+                throw new InvalidOperationException($"tar extraction failed: {stderr}");
+        }
+
+        private static void TryMakeExecutable(string path)
+        {
+            if (!OperatingSystem.IsLinux()) return;
+
+            try
+            {
+                if (chmod(path, 0x755) != 0)
+                    Console.WriteLine($"[DependencyManager] Warning: chmod failed for {path}.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[DependencyManager] Warning: could not mark {path} executable: {ex.Message}");
+            }
+        }
+
+        [DllImport("libc", SetLastError = true, EntryPoint = "chmod")]
+        private static extern int chmod(string pathname, int mode);
+
         private static void TryLogFfmpegVersion(string ffmpegPath)
         {
             try
@@ -190,98 +295,40 @@ paths:
             }
         }
 
-        private static async Task<bool> EnsureViGEmBusAsync()
-        {
-            Console.WriteLine("[DependencyManager] Checking ViGEmBus driver...");
-            try
-            {
-                // Test if driver exists by instantiating client
-                var testClient = new ViGEmClient();
-                Console.WriteLine("[DependencyManager] ViGEmBus driver found.");
-                return true;
-            }
-            catch (Exception)
-            {
-                Console.WriteLine("[DependencyManager] ViGEmBus Driver not found! Initiating installation...");
-                await InstallViGEmBusAsync();
-                return false;
-            }
-        }
-
-        private static async Task InstallViGEmBusAsync()
-        {
-            string installerPath = Path.Combine(BinPath, "vigembus_installer.exe");
-
-            Console.WriteLine("[DependencyManager] Downloading ViGEmBus installer...");
-            await DownloadFileAsync(VigemUrl, installerPath);
-
-            Console.WriteLine("[DependencyManager] Launching Installer to install Virtual Xbox Controller Driver.");
-            Console.WriteLine("[!!!] PLEASE ACCEPT THE WINDOWS UAC PROMPT IF IT APPEARS [!!!]");
-
-            Process installer = new Process();
-            installer.StartInfo.FileName = installerPath;
-            // Silent install flag for standard installers, though UAC will still pop
-            installer.StartInfo.Arguments = "/q";
-            installer.StartInfo.UseShellExecute = true; // Needed for UAC elevation
-            installer.StartInfo.Verb = "runas";
-
-            try
-            {
-                installer.Start();
-                installer.WaitForExit();
-
-                // Quick validation
-                using (var testClient = new ViGEmClient()) { }
-                Console.WriteLine("[DependencyManager] ViGEmBus installed successfully.");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[DependencyManager] CRITICAL: Failed to install ViGEmBus. You must install it manually. Error: {ex.Message}");
-            }
-            finally
-            {
-                if (File.Exists(installerPath)) File.Delete(installerPath);
-            }
-        }
-
         private static async Task DownloadFileAsync(string url, string outputPath)
         {
-            using (var client = new HttpClient())
+            using var client = new HttpClient();
+            client.DefaultRequestHeaders.Add("User-Agent", "EmulationScreen-Server/1.0");
+
+            using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+            response.EnsureSuccessStatusCode();
+
+            long? totalBytes = response.Content.Headers.ContentLength;
+            await using var contentStream = await response.Content.ReadAsStreamAsync();
+            await using var fileStream = new FileStream(outputPath, FileMode.Create, FileAccess.Write, FileShare.None);
+
+            var buffer = new byte[8192];
+            long totalReadBytes = 0;
+            int readBytes;
+            int lastProgress = -1;
+
+            while ((readBytes = await contentStream.ReadAsync(buffer)) > 0)
             {
-                client.DefaultRequestHeaders.Add("User-Agent", "EmulationScreen-Server/1.0");
+                await fileStream.WriteAsync(buffer.AsMemory(0, readBytes));
+                totalReadBytes += readBytes;
 
-                using (var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead))
+                if (totalBytes.HasValue)
                 {
-                    response.EnsureSuccessStatusCode();
-
-                    long? totalBytes = response.Content.Headers.ContentLength;
-                    using (var contentStream = await response.Content.ReadAsStreamAsync())
-                    using (var fileStream = new FileStream(outputPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                    int progress = (int)((double)totalReadBytes / totalBytes.Value * 100);
+                    if (progress % 5 == 0 && progress != lastProgress)
                     {
-                        var buffer = new byte[8192];
-                        long totalReadBytes = 0;
-                        int readBytes;
-                        int lastProgress = -1;
-
-                        while ((readBytes = await contentStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
-                        {
-                            await fileStream.WriteAsync(buffer, 0, readBytes);
-                            totalReadBytes += readBytes;
-
-                            if (totalBytes.HasValue)
-                            {
-                                int progress = (int)((double)totalReadBytes / totalBytes.Value * 100);
-                                if (progress % 5 == 0 && progress != lastProgress) // Print every 5%
-                                {
-                                    Console.Write($"\r[DependencyManager] Downloading... {progress}% ({totalReadBytes / 1024 / 1024} MB / {totalBytes.Value / 1024 / 1024} MB)");
-                                    lastProgress = progress;
-                                }
-                            }
-                        }
-                        Console.WriteLine("\n[DependencyManager] Download Complete!");
+                        Console.Write($"\r[DependencyManager] Downloading... {progress}% ({totalReadBytes / 1024 / 1024} MB / {totalBytes.Value / 1024 / 1024} MB)");
+                        lastProgress = progress;
                     }
                 }
             }
+
+            Console.WriteLine("\n[DependencyManager] Download Complete!");
         }
     }
 }

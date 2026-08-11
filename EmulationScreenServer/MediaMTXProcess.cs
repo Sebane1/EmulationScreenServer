@@ -20,7 +20,7 @@ namespace EmulationScreenServer
             // If Start is called multiple times, stop the previous instance first.
             Stop();
 
-            string exePath = Path.Combine(_binPath, "mediamtx.exe");
+            string exePath = Path.Combine(_binPath, OperatingSystem.IsWindows() ? "mediamtx.exe" : "mediamtx");
             if (!File.Exists(exePath))
             {
                 Console.WriteLine("[MediaMTX] ERORR: Executable not found. Did DependencyManager fail?");

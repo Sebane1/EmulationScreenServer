@@ -4,8 +4,10 @@ using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
 using EmulationScreenServer.Platform;
-using EmulationScreenServer.Platform.Windows;
 using EmulationScreenServer.Platform.Linux;
+#if WINDOWS
+using EmulationScreenServer.Platform.Windows;
+#endif
 
 namespace EmulationScreenServer
 {
@@ -34,11 +36,13 @@ namespace EmulationScreenServer
             _fps = Math.Clamp(TryGetIntFromEnv("EMUSCREEN_FPS", fps), 1, 240);
             _enableAudioDefault = !string.Equals(Environment.GetEnvironmentVariable("EMUSCREEN_AUDIO"), "0", StringComparison.OrdinalIgnoreCase);
 
+#if WINDOWS
             if (OperatingSystem.IsWindows())
             {
                 _screenProvider = new WindowsScreenCaptureProvider();
             }
             else
+#endif
             {
                 _screenProvider = new LinuxScreenCaptureProvider();
             }
@@ -93,11 +97,13 @@ namespace EmulationScreenServer
             // 2. Get Platform Audio Args
             if (enableAudio)
             {
+#if WINDOWS
                 if (OperatingSystem.IsWindows())
                 {
                     _audioProvider = new WindowsAudioCaptureProvider();
                 }
                 else
+#endif
                 {
                     _audioProvider = new LinuxAudioCaptureProvider();
                 }

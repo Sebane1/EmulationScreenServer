@@ -3,8 +3,10 @@ using System.Threading;
 using System.Threading.Tasks;
 
 using EmulationScreenServer.Platform;
-using EmulationScreenServer.Platform.Windows;
 using EmulationScreenServer.Platform.Linux;
+#if WINDOWS
+using EmulationScreenServer.Platform.Windows;
+#endif
 
 namespace EmulationScreenServer
 {
@@ -93,12 +95,15 @@ namespace EmulationScreenServer
 
                 if (EnableMouseForwarding || EnableControllerForwarding)
                 {
+#if WINDOWS
                     if (OperatingSystem.IsWindows())
                     {
                         _input = new WindowsInputSimulator(EnableMouseForwarding, EnableControllerForwarding);
                         Log("[Controller] WindowsInputSimulator created.");
                     }
-                    else if (OperatingSystem.IsLinux())
+                    else
+#endif
+                    if (OperatingSystem.IsLinux())
                     {
                         _input = new LinuxInputSimulator(EnableMouseForwarding, EnableControllerForwarding);
                         Log("[Controller] LinuxInputSimulator created (/dev/uinput).");
