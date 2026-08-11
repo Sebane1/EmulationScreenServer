@@ -32,11 +32,17 @@ jobs:
 
       - name: Publish
         shell: bash
+        env:
+          APP_VERSION: ${{ github.ref_name }}
         run: |
+          VERSION="${APP_VERSION#v}"
           dotnet publish "$PROJECT_PATH" \
             --configuration Release \
             --framework "$DOTNET_FRAMEWORK" \
             -p:TargetFrameworks="$DOTNET_FRAMEWORK" \
+            -p:Version="$VERSION" \
+            -p:AssemblyVersion="$VERSION.0" \
+            -p:FileVersion="$VERSION.0" \
             --runtime "$DOTNET_RUNTIME" \
             --self-contained true \
             -p:PublishReadyToRun=true \
@@ -74,11 +80,17 @@ jobs:
 
       - name: Publish
         shell: bash
+        env:
+          APP_VERSION: ${{ github.ref_name }}
         run: |
+          VERSION="${APP_VERSION#v}"
           dotnet publish "$PROJECT_PATH" \
             --configuration Release \
             --framework "$DOTNET_FRAMEWORK" \
             -p:TargetFrameworks="$DOTNET_FRAMEWORK" \
+            -p:Version="$VERSION" \
+            -p:AssemblyVersion="$VERSION.0" \
+            -p:FileVersion="$VERSION.0" \
             --runtime "$DOTNET_RUNTIME" \
             --self-contained true \
             -p:PublishReadyToRun=true \

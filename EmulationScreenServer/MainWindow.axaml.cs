@@ -3,6 +3,7 @@ using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace EmulationScreenServer
@@ -11,6 +12,8 @@ namespace EmulationScreenServer
     {
         private EmulationServerController _controller;
         private UiLogWriter _logWriter;
+        private UpdateInfo? _pendingUpdate;
+        private bool _updateCheckRunning;
 
         [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Auto, SetLastError = true)]
         private static extern uint SetThreadExecutionState(uint esFlags);
@@ -41,6 +44,9 @@ namespace EmulationScreenServer
                 }
                 _controller.Stop();
             };
+
+            AppVersionText.Text = $"Version {AppVersion.Current}";
+            Opened += async (_, _) => await CheckForUpdatesAsync(showIfUpToDate: false);
         }
 
         private void AppendLog(string message)
@@ -90,26 +96,33 @@ namespace EmulationScreenServer
         private void OnStopClicked(object sender, RoutedEventArgs e)
         {
             StopButton.IsEnabled = false;
-            
-            Task.Run(() => {
-                _controller.Stop();
-                Dispatcher.UIThread.Post(() => {
-                    StatusText.Text = "Status: Stopped";
-                    StatusText.Foreground = Avalonia.Media.Brushes.DarkGray;
-                    LocalRtspUrlBox.Text = string.Empty;
-                    PublicRtspUrlBox.Text = string.Empty;
-                    InputStatusText.Text = "Not running";
-                    InputStatusText.Foreground = Avalonia.Media.Brushes.Gray;
-                    StartButton.IsEnabled = true;
-                    
-                    // Re-enable settings
-                    MonitorIndexSpinner.IsEnabled = true;
-                    FpsSpinner.IsEnabled = true;
-                    EnableAudioCheckBox.IsEnabled = true;
-                    EnableMouseForwardingCheckBox.IsEnabled = true;
-                    EnableControllerForwardingCheckBox.IsEnabled = true;
-                });
-            });
+            _ = StopServerAsync();
+        }
+
+        private async Task StopServerAsync()
+        {
+            if (!_controller.IsRunning) return;
+
+            await Task.Run(() => _controller.Stop());
+            await Dispatcher.UIThread.InvokeAsync(ApplyStoppedUi);
+        }
+
+        private void ApplyStoppedUi()
+        {
+            StatusText.Text = "Status: Stopped";
+            StatusText.Foreground = Avalonia.Media.Brushes.DarkGray;
+            LocalRtspUrlBox.Text = string.Empty;
+            PublicRtspUrlBox.Text = string.Empty;
+            InputStatusText.Text = "Not running";
+            InputStatusText.Foreground = Avalonia.Media.Brushes.Gray;
+            StartButton.IsEnabled = true;
+            StopButton.IsEnabled = false;
+
+            MonitorIndexSpinner.IsEnabled = true;
+            FpsSpinner.IsEnabled = true;
+            EnableAudioCheckBox.IsEnabled = true;
+            EnableMouseForwardingCheckBox.IsEnabled = true;
+            EnableControllerForwardingCheckBox.IsEnabled = true;
         }
 
         private static string FormatInputStatus(bool mouse, bool controller)
@@ -150,6 +163,108 @@ namespace EmulationScreenServer
             if (clipboard != null)
             {
                 await clipboard.SetTextAsync(text);
+            }
+        }
+
+        private async void OnCheckForUpdatesClicked(object sender, RoutedEventArgs e)
+        {
+            await CheckForUpdatesAsync(showIfUpToDate: true);
+        }
+
+        private async Task CheckForUpdatesAsync(bool showIfUpToDate)
+        {
+            if (_updateCheckRunning) return;
+            _updateCheckRunning = true;
+
+            try
+            {
+                var update = await Task.Run(() => GitHubUpdateService.CheckForUpdateAsync());
+                Dispatcher.UIThread.Post(() =>
+                {
+                    if (update != null)
+                        ShowUpdateBanner(update);
+                    else if (showIfUpToDate)
+                    {
+                        UpdateBannerTitle.Text = "You're up to date";
+                        UpdateBannerText.Text = $"Emulation Screen Server {AppVersion.Current} is the latest release.";
+                        UpdateBanner.IsVisible = true;
+                        InstallUpdateButton.IsVisible = false;
+                        DismissUpdateButton.Content = "OK";
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Update] Check failed: {ex.Message}");
+                if (showIfUpToDate)
+                {
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        UpdateBannerTitle.Text = "Update check failed";
+                        UpdateBannerText.Text = ex.Message;
+                        UpdateBanner.IsVisible = true;
+                        InstallUpdateButton.IsVisible = false;
+                        DismissUpdateButton.Content = "OK";
+                    });
+                }
+            }
+            finally
+            {
+                _updateCheckRunning = false;
+            }
+        }
+
+        private void ShowUpdateBanner(UpdateInfo update)
+        {
+            _pendingUpdate = update;
+            UpdateBannerTitle.Text = $"Update available: {update.Version}";
+            UpdateBannerText.Text = string.IsNullOrWhiteSpace(update.ReleaseNotes)
+                ? "A newer version is available on GitHub."
+                : update.ReleaseNotes.Trim();
+            InstallUpdateButton.IsVisible = true;
+            InstallUpdateButton.IsEnabled = true;
+            InstallUpdateButton.Content = "Download & Install";
+            DismissUpdateButton.Content = "Later";
+            UpdateBanner.IsVisible = true;
+        }
+
+        private void OnDismissUpdateClicked(object? sender, RoutedEventArgs e)
+        {
+            UpdateBanner.IsVisible = false;
+            InstallUpdateButton.IsVisible = true;
+            DismissUpdateButton.Content = "Later";
+        }
+
+        private async void OnInstallUpdateClicked(object? sender, RoutedEventArgs e)
+        {
+            if (_pendingUpdate == null) return;
+
+            InstallUpdateButton.IsEnabled = false;
+            DismissUpdateButton.IsEnabled = false;
+            InstallUpdateButton.Content = "Updating...";
+
+            try
+            {
+                if (_controller.IsRunning)
+                {
+                    UpdateBannerText.Text = "Stopping server before update...";
+                    await StopServerAsync();
+                }
+
+                var progress = new Progress<string>(message =>
+                {
+                    Dispatcher.UIThread.Post(() => UpdateBannerText.Text = message);
+                });
+
+                await Task.Run(() => GitHubUpdateService.ApplyUpdateAsync(_pendingUpdate, progress));
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Update] Install failed: {ex.Message}");
+                InstallUpdateButton.IsEnabled = true;
+                DismissUpdateButton.IsEnabled = true;
+                InstallUpdateButton.Content = "Download & Install";
+                UpdateBannerText.Text = $"Update failed: {ex.Message}";
             }
         }
     }

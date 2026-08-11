@@ -8,16 +8,28 @@
         Width="700" Height="580"
         WindowStartupLocation="CenterScreen">
 
-  <Grid RowDefinitions="Auto,*">
+  <Grid RowDefinitions="Auto,Auto,*">
+    <!-- Update banner -->
+    <Border Grid.Row="0" x:Name="UpdateBanner" IsVisible="False" Background="#1e3a2f" Padding="10" Margin="10,10,10,0" CornerRadius="4">
+      <Grid ColumnDefinitions="*,Auto,Auto">
+        <StackPanel Grid.Column="0" Spacing="4">
+          <TextBlock x:Name="UpdateBannerTitle" Foreground="White" FontWeight="Bold"/>
+          <TextBlock x:Name="UpdateBannerText" Foreground="#b8e0c8" TextWrapping="Wrap" MaxHeight="60"/>
+        </StackPanel>
+        <Button Grid.Column="1" x:Name="InstallUpdateButton" Content="Download &amp; Install" Margin="10,0,0,0" VerticalAlignment="Center" Click="OnInstallUpdateClicked"/>
+        <Button Grid.Column="2" x:Name="DismissUpdateButton" Content="Later" Margin="10,0,0,0" VerticalAlignment="Center" Click="OnDismissUpdateClicked"/>
+      </Grid>
+    </Border>
+
     <!-- Top Bar / Controls -->
-    <StackPanel Grid.Row="0" Margin="10" Spacing="10" Orientation="Horizontal">
+    <StackPanel Grid.Row="1" Margin="10" Spacing="10" Orientation="Horizontal">
       <Button x:Name="StartButton" Content="Start Server" Background="DarkGreen" Foreground="White" Width="120" HorizontalContentAlignment="Center" Click="OnStartClicked"/>
       <Button x:Name="StopButton" Content="Stop Server" Background="DarkRed" Foreground="White" Width="120" HorizontalContentAlignment="Center" IsEnabled="False" Click="OnStopClicked"/>
       <TextBlock x:Name="StatusText" Text="Status: Stopped" VerticalAlignment="Center" FontWeight="Bold" Foreground="DarkGray" Margin="10,0,0,0"/>
     </StackPanel>
 
     <!-- Main Content Tab Control -->
-    <TabControl Grid.Row="1" Margin="10,0,10,10">
+    <TabControl Grid.Row="2" Margin="10,0,10,10">
       
       <!-- General Tab -->
       <TabItem Header="Dashboard">
@@ -57,6 +69,10 @@
             <CheckBox Grid.Row="4" Grid.Column="1" x:Name="EnableControllerForwardingCheckBox" IsChecked="True"/>
           </Grid>
           <TextBlock Text="Note: Configuration changes only apply after restarting the server." FontStyle="Italic" Foreground="Gray" Margin="0,20,0,0"/>
+
+          <TextBlock Text="Application" FontWeight="Bold" Margin="0,16,0,0"/>
+          <TextBlock x:Name="AppVersionText" Foreground="Gray"/>
+          <Button Content="Check for Updates" Click="OnCheckForUpdatesClicked" Width="200" HorizontalAlignment="Left" Margin="0,8,0,0"/>
         </StackPanel>
       </TabItem>
 
