@@ -12,7 +12,7 @@
     <PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
   </PropertyGroup>
 
-  <!-- On Linux (CI or local), only target net10.0 — Windows TFM cannot be restored there. -->
+  <!-- On Linux (CI or local), only target net10.0 Windows TFM cannot be restored there. -->
   <PropertyGroup Condition="'$(OS)' == 'Unix'">
     <TargetFrameworks>net10.0</TargetFrameworks>
   </PropertyGroup>

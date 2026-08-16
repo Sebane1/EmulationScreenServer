@@ -16,9 +16,24 @@ namespace EmulationScreenServer
             Console.WriteLine("[DependencyManager] Checking ViGEmBus driver...");
             try
             {
-                var testClient = new ViGEmClient();
-                testClient.Dispose();
-                Console.WriteLine("[DependencyManager] ViGEmBus driver found.");
+                // ViGEmClient constructor can hang if the driver is in a bad state,
+                // so we run the check with a timeout to avoid blocking startup.
+                var checkTask = Task.Run(() =>
+                {
+                    var testClient = new ViGEmClient();
+                    testClient.Dispose();
+                });
+
+                if (await Task.WhenAny(checkTask, Task.Delay(5000)) == checkTask)
+                {
+                    await checkTask; // Propagate any exception from the check
+                    Console.WriteLine("[DependencyManager] ViGEmBus driver found.");
+                }
+                else
+                {
+                    Console.WriteLine("[DependencyManager] WARNING: ViGEmBus driver check timed out. The driver may be in a bad state.");
+                    Console.WriteLine("[DependencyManager] Controller forwarding may not be available. Consider reinstalling ViGEmBus.");
+                }
             }
             catch (Exception)
             {

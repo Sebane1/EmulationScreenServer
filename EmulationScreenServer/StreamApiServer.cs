@@ -39,7 +39,7 @@ namespace EmulationScreenServer
                 _thread.Start();
 
                 Console.WriteLine($"[API] Stream Info Server listening on http://*:{_port}/streaminfo/");
-                Console.WriteLine($"[API] VRChat: use JSON field vrchatVideoUrl (RTSP) in the video player — usually lower latency than HLS.");
+                Console.WriteLine($"[API] VRChat: use JSON field vrchatVideoUrl (RTSP) in the video player usually lower latency than HLS.");
             }
             catch (HttpListenerException ex)
             {
@@ -63,7 +63,7 @@ namespace EmulationScreenServer
                     _thread.Start();
 
                     Console.WriteLine($"[API] Stream Info Server listening on http://localhost:{_port}/streaminfo/");
-                    Console.WriteLine($"[API] VRChat: use JSON field vrchatVideoUrl (RTSP) in the video player — usually lower latency than HLS.");
+                    Console.WriteLine($"[API] VRChat: use JSON field vrchatVideoUrl (RTSP) in the video player usually lower latency than HLS.");
                 }
                 else
                 {
@@ -121,7 +121,7 @@ namespace EmulationScreenServer
                 var data = new
                 {
                     rtspUrl = rtsp,
-                    // Same stream as rtspUrl — use this URL in VRChat's video player when RTSP is supported.
+                    // Same stream as rtspUrl use this URL in VRChat's video player when RTSP is supported.
                     vrchatVideoUrl = rtsp,
                     hlsUrl = $"http://{baseIp}:8888/live/screen_{_sessionId}/index.m3u8",
                     // FFmpeg publishes here; viewers generally use rtspUrl / vrchatVideoUrl or hlsUrl instead.

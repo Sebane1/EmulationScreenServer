@@ -115,7 +115,7 @@ namespace EmulationScreenServer
                 }
                 else
                 {
-                    Log("[Controller] Input forwarding disabled — no virtual devices will be created.");
+                    Log("[Controller] Input forwarding disabled no virtual devices will be created.");
                 }
 
                 _binaryListener = new BinaryInputListener(50051, sessionId);
