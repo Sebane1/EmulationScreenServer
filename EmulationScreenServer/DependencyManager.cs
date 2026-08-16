@@ -120,9 +120,20 @@ namespace EmulationScreenServer
                 hls: yes
                 hlsAddress: :8888
                 hlsVariant: lowLatency
+                authInternalUsers:
+                  - user: any
+                    pass: ""
+                    ips: ['127.0.0.1', '::1']
+                    permissions:
+                      - action: publish
+                  - user: any
+                    pass: ""
+                    ips: []
+                    permissions:
+                      - action: read
+                      - action: playback
                 paths:
                   all:
-                    allowPublishIPs: ['127.0.0.1', '::1']
                 """;
 
             File.WriteAllText(ymlPath, config);
